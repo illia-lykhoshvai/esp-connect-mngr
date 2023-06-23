@@ -1,0 +1,124 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf8" />
+    </head>
+    <body>
+        <div id="form">
+            <div id="form-child">
+                <h3>Connect to Wi-Fi</h3>
+                <div>
+                    <label for="networkSelect">Network:</label>
+                    <select id="networkSelect" name="networkSelect" disabled>
+                        <option>Scanning...</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="pass">Password:</label>
+                    <input type="password" id="pass" name="password">
+                </div>
+                <input type="submit" id="connect-button" value="Connect">
+            </div>
+        </div>
+        <script>
+            var gateway = `ws://${window.location.hostname}/ws`;
+            var websocket;
+            window.addEventListener('load', onLoad);
+            function initWebSocket() {
+                console.log('Trying to open a WebSocket connection...');
+                websocket = new WebSocket(gateway);
+                websocket.onopen = onOpen;
+                websocket.onclose = onClose;
+                websocket.onmessage = onMessage; 
+            }
+            function onOpen(event) {
+                console.log('Connection opened');
+                start_scan();
+            }
+            function onClose(event) {
+                console.log('Connection closed');
+                setTimeout(initWebSocket, 2000);
+            }
+            function onMessage(event) {
+                console.log(event.data);
+                var response = JSON.parse(event.data);
+                if (response.responseType === "scanResponse" && response.status === "ok") {
+                    console.log('Scan response successful');
+                    var container = document.getElementById('networkSelect');
+                    container.innerHTML = ''; // clears the fields in <select>
+                    response.scanResults.forEach(function(item) {
+                        // Create an element
+                        var opt = document.createElement('option');
+                        opt.value = item.ssid;
+                        opt.innerHTML = item.ssid;
+                        // Append the element to the container
+                        container.appendChild(opt);
+                    });
+                    container.disabled = false;
+                }
+            }
+            function start_scan() {
+                var scanReq = {
+                    request: "scan"
+                };
+                websocket.send(JSON.stringify(scanReq));
+            }
+            function transmitValues() {
+                var ssid = document.getElementById("networkSelect").value;
+                var password = document.getElementById("pass").value;
+                document.getElementById("pass").value = "";
+                if (ssid !== 0) {
+                    let wifiAP = {
+                        request: 'connect',
+                        ssid: `${ssid}`,
+                        pass: ""
+                    };
+                    if (password !== "") {
+                        if (password.length < 8) {
+                            alert("Password length should be more then 8!");
+                        } else {
+                            wifiAP.pass = `${password}`;
+                            var jsonString = `${JSON.stringify(wifiAP)}`;
+                            console.log(jsonString);
+                            websocket.send(jsonString);
+                        }
+                    } else {
+                        var jsonString = `${JSON.stringify(wifiAP)}`
+                        console.log(jsonString);
+                        websocket.send(jsonString);
+                    }
+                }
+            }
+            function initButton() {
+                document.getElementById('connect-button').addEventListener('click', transmitValues);
+            }
+            function onLoad(event) {
+                initWebSocket();
+                initButton();
+            }
+        </script> 
+        <style>
+            div#form {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            div#form-child {
+                border: thick double #32a1ce;
+                border-radius: 40px;
+                padding: 25px;
+                margin: 3px;
+            }
+
+            label {
+                display: block;
+                font: 0.9rem 'Fira Sans', sans-serif;
+            }
+            
+            input[type='submit'],
+            label {
+                margin-top: 1rem;
+            }
+        </style>
+    </body>
+</html>
